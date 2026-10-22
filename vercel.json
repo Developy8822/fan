@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/get",
-      "destination": "/api/hello"
+      "destination": "/api/loader"
     }
   ]
 }
