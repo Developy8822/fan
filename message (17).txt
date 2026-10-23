@@ -3383,7 +3383,7 @@ do
     end
 end
 
-setfpscap(25)
+
 -- ===================== AIMLOCK / TRIGGERBOT / SILENT =====================
 do
     getgenv().SW_aimlockUpdate = function()
