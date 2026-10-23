@@ -1,6 +1,4 @@
--- ================================================================= --
---  FANITY.GG × SPECTREWARE — v7.0 (final: hitlogs avatars, hit sounds) --
--- ================================================================= --
+--9MUR ваплюапшвлапдимвашплвапш лненадо прошуопьап
 
 local Players           = game:GetService("Players")
 local UIS               = game:GetService("UserInputService")
