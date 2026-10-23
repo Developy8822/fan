@@ -2,8 +2,6 @@
 --  FANITY.GG × SPECTREWARE — v7.0 (final: hitlogs avatars, hit sounds) --
 -- ================================================================= --
 
-
-
 local Players           = game:GetService("Players")
 local UIS               = game:GetService("UserInputService")
 local RunService        = game:GetService("RunService")
@@ -19,12 +17,7 @@ local Debris            = game:GetService("Debris")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local LocalPlayer       = Players.LocalPlayer
 local Camera            = Workspace.CurrentCamera
-local hasTouch          = UIS.TouchEnabled
-local hasKeyboard       = UIS.KeyboardEnabled
--- Мобильный = есть тач. Наличие клавы не отменяет мобилу (эмуляторы, планшеты)
-local isMobile          = hasTouch and not hasKeyboard
--- Принудительно считаем мобилой если есть тач, даже если есть клава — иначе меню не открыть
-local forceMobileUI     = hasTouch
+local isMobile          = UIS.TouchEnabled and not UIS.KeyboardEnabled
 
 if CoreGui:FindFirstChild("FanityUI_Engine") then CoreGui.FanityUI_Engine:Destroy() end
 if getgenv().SW_unload then pcall(getgenv().SW_unload) end
@@ -195,7 +188,8 @@ do
     local Tween = getgenv().SW_Tween
     local PopupLayer = getgenv().SW_PopupLayer
     local CP_Overlay = getgenv().SW_CP_Overlay
-    getgenv().SW_isMobile = hasTouch and not hasKeyboard
+    local isMobile = (UIS.TouchEnabled and not UIS.KeyboardEnabled)
+    getgenv().SW_isMobile = isMobile
 
     local function CreateColumns(tabParent)
         local lc=Instance.new("Frame"); lc.Size=UDim2.new(0,226,0,0); lc.Position=UDim2.new(0,5,0,0); lc.BackgroundTransparency=1; lc.Parent=tabParent
@@ -241,7 +235,7 @@ do
         local kb=Instance.new("TextButton"); kb.Size=UDim2.new(0,32,0,14); kb.Position=UDim2.new(1,-66,0.5,-7)
         kb.BackgroundColor3=Theme.ToggleOff; kb.BorderSizePixel=0; kb.Font=Enum.Font.GothamBold
         kb.TextSize=9; kb.TextColor3=Theme.TextSub; kb.Text=defaultKey or "NONE"; kb.Parent=tb
-    if hasTouch then kb.Visible = false end
+        if isMobile then kb.Visible = false end
         local kbc=Instance.new("UICorner"); kbc.CornerRadius=UDim.new(0,3); kbc.Parent=kb
         local track=Instance.new("Frame"); track.Size=UDim2.new(0,28,0,14); track.Position=UDim2.new(1,-28,0.5,-7)
         track.BackgroundColor3=Flags[flag] and Theme.AccentWhite or Theme.ToggleOff; track.BorderSizePixel=0; track.Parent=tb
@@ -615,11 +609,7 @@ do
     getgenv().SW_CanvasGroupRef = CanvasGroup
     getgenv().SW_CanvasGroup = CanvasGroup
     if isMobile then
-            -- Для ЛЮБОГО тача (даже если есть клава) — уменьшаем UI под мобилу
-    if hasTouch then
         local uiScale = Instance.new("UIScale"); uiScale.Scale = 0.6; uiScale.Parent = CanvasGroup
-        CanvasGroup.Position = UDim2.new(0.5, -192, 0.5, -138)
-    end
         CanvasGroup.Position = UDim2.new(0.5, -192, 0.5, -138)
     end
     local g=Instance.new("UIGradient"); g.Color=ColorSequence.new(Theme.BgStart,Theme.BgEnd); g.Rotation=45; g.Parent=CanvasGroup
@@ -3383,7 +3373,6 @@ do
     end
 end
 
-
 -- ===================== AIMLOCK / TRIGGERBOT / SILENT =====================
 do
     getgenv().SW_aimlockUpdate = function()
@@ -3535,7 +3524,6 @@ do
 end
 
 -- ===================== HIT SOUNDS (единый звук, только наш удар) =====================
--- ===================== HIT SOUNDS (единый звук, единая громкость) =====================
 do
     local hitSoundList = {
         ["None"]="", ["Skeet"]="rbxassetid://83717596220569", ["Sonic checkpoint"]="rbxassetid://6817150445",
@@ -3548,50 +3536,28 @@ do
     }
     local HIT_NAMES = { ["hit"]=true, ["headshothit"]=true, ["headshot"]=true }
     local selectedHitSoundId = ""
-    local hitVolume = 1  -- 0-3, ставим через getgenv().SW_setHitVolume
 
-    -- Проверяем, что звук принадлежит НАМ (Tool в нашем Character, Viewmodel, ViewmodelArms, Arms)
     local function isOurHitSound(snd)
         if not snd or not snd.Parent then return false end
-        -- Прямой Tool в нашем Character
-        local cur = snd.Parent
+        local parent = snd.Parent
         local depth = 0
-        while cur and depth < 8 do
-            if cur == LocalPlayer.Character then return true end
-            if cur.Name == "Viewmodel" or cur.Name == "ViewmodelArms" or cur.Name == "Arms" then return true end
-            if cur:IsA("Tool") and cur.Parent == LocalPlayer.Character then return true end
-            cur = cur.Parent; depth = depth + 1
+        while parent and parent ~= workspace and depth < 6 do
+            if parent:IsA("Tool") and parent.Parent == LocalPlayer.Character then return true end
+            if parent.Name == "Viewmodel" or parent.Name == "ViewmodelArms" then return true end
+            parent = parent.Parent; depth = depth + 1
         end
-        -- Камера Viewmodel
-        local cam = workspace.CurrentCamera
-        if cam then
-            local vm = cam:FindFirstChild("Viewmodel")
-            if vm and snd:IsDescendantOf(vm) then return true end
-            local vma = cam:FindFirstChild("ViewmodelArms")
-            if vma and snd:IsDescendantOf(vma) then return true end
-        end
+        local vm = Camera:FindFirstChild("Viewmodel")
+        if vm and snd:IsDescendantOf(vm) then return true end
         return false
     end
 
-    -- Применяем громкость + SoundId к одному звуку
     local function applyToSound(snd)
         if not snd or not snd:IsA("Sound") then return end
         if not HIT_NAMES[string.lower(snd.Name)] then return end
         if selectedHitSoundId == "" then return end
-        if not isOurHitSound(snd) then return end
-        -- Единый SoundId
-        if snd.SoundId ~= selectedHitSoundId then snd.SoundId = selectedHitSoundId end
-        -- Единая громкость на всех частях тела
-        if snd.Volume ~= hitVolume then snd.Volume = hitVolume end
-        -- Отключаем затухание, чтобы звук из любой части играл одинаково
-        if snd.RollOffMode ~= Enum.RollOffMode.Inverse then snd.RollOffMode = Enum.RollOffMode.Inverse end
-        if snd.RollOffMinDistance ~= 10000 then snd.RollOffMinDistance = 10000 end
-        if snd.RollOffMaxDistance ~= 10000 then snd.RollOffMaxDistance = 10000 end
-        -- PlaybackSpeed выравниваем
-        if snd.PlaybackSpeed ~= 1 then snd.PlaybackSpeed = 1 end
+        if isOurHitSound(snd) then snd.SoundId = selectedHitSoundId end
     end
 
-    -- Применяем ко всем Sound в контейнере + подписываемся на новые
     local function applyToContainer(container)
         if not container then return end
         for _, d in ipairs(container:GetDescendants()) do
@@ -3604,17 +3570,11 @@ do
 
     local function bindTool(tool) if tool then applyToContainer(tool) end end
     local function bindViewmodel(vm) if vm then applyToContainer(vm) end end
-
     local function setupCharacter(char)
         if not char then return end
-        char.ChildAdded:Connect(function(child)
-            if child:IsA("Tool") then bindTool(child) end
-        end)
-        for _, child in ipairs(char:GetChildren()) do
-            if child:IsA("Tool") then bindTool(child) end
-        end
+        char.ChildAdded:Connect(function(child) if child:IsA("Tool") then bindTool(child) end end)
+        for _, child in ipairs(char:GetChildren()) do if child:IsA("Tool") then bindTool(child) end end
     end
-
     local vmConn = nil
     local function setupViewmodel()
         if vmConn then pcall(function() vmConn:Disconnect() end); vmConn = nil end
@@ -3622,26 +3582,19 @@ do
         if not cam then return end
         local vm = cam:FindFirstChild("Viewmodel")
         if vm then bindViewmodel(vm) end
-        local vma = cam:FindFirstChild("ViewmodelArms")
-        if vma then bindViewmodel(vma) end
         vmConn = cam.ChildAdded:Connect(function(child)
-            if child.Name == "Viewmodel" or child.Name == "ViewmodelArms" or child.Name == "Arms" then
-                bindViewmodel(child)
-            end
+            if child.Name == "Viewmodel" or child.Name == "ViewmodelArms" then bindViewmodel(child) end
         end)
     end
 
     if LocalPlayer.Character then setupCharacter(LocalPlayer.Character) end
-    SW.connect(LocalPlayer.CharacterAdded, function(ch)
-        task.wait(0.5); setupCharacter(ch); setupViewmodel()
-    end)
+    SW.connect(LocalPlayer.CharacterAdded, function(ch) task.wait(0.5); setupCharacter(ch); setupViewmodel() end)
     setupViewmodel()
 
     getgenv().SW_hitSoundList = hitSoundList
     getgenv().SW_setHitSound = function(id)
         selectedHitSoundId = id or ""
         if selectedHitSoundId == "" then return end
-        -- Применяем ко всем уже существующим
         if LocalPlayer.Character then
             for _, tool in ipairs(LocalPlayer.Character:GetChildren()) do
                 if tool:IsA("Tool") then
@@ -3651,46 +3604,13 @@ do
                 end
             end
         end
-        local cam = workspace.CurrentCamera
-        if cam then
-            for _, cname in ipairs({"Viewmodel", "ViewmodelArms", "Arms"}) do
-                local vm = cam:FindFirstChild(cname)
-                if vm then
-                    for _, d in ipairs(vm:GetDescendants()) do
-                        if d:IsA("Sound") then applyToSound(d) end
-                    end
-                end
+        local vm = Camera:FindFirstChild("Viewmodel")
+        if vm then
+            for _, d in ipairs(vm:GetDescendants()) do
+                if d:IsA("Sound") then applyToSound(d) end
             end
         end
     end
-
-    -- НОВОЕ: громкость
-    getgenv().SW_setHitVolume = function(vol)
-        hitVolume = tonumber(vol) or 1
-        -- Применяем ко всем уже существующим
-        if LocalPlayer.Character then
-            for _, tool in ipairs(LocalPlayer.Character:GetChildren()) do
-                if tool:IsA("Tool") then
-                    for _, d in ipairs(tool:GetDescendants()) do
-                        if d:IsA("Sound") then applyToSound(d) end
-                    end
-                end
-            end
-        end
-        local cam = workspace.CurrentCamera
-        if cam then
-            for _, cname in ipairs({"Viewmodel", "ViewmodelArms", "Arms"}) do
-                local vm = cam:FindFirstChild(cname)
-                if vm then
-                    for _, d in ipairs(vm:GetDescendants()) do
-                        if d:IsA("Sound") then applyToSound(d) end
-                    end
-                end
-            end
-        end
-    end
-    getgenv().SW_setHitVolume(1)
-
     getgenv().SW_hitSoundCleanup = function()
         if vmConn then pcall(function() vmConn:Disconnect() end); vmConn = nil end
     end
@@ -4013,7 +3933,7 @@ do
             getgenv().SW_GunChamsData.Material = Enum.Material[v] or Enum.Material.Neon
         end)
     end
-        do
+    do
         local C = CreateCard(CR, "Hit Sounds")
         AddDropdown(C, "Hit Sound", "combat_hitsound",
             {"None","Skeet","Sonic checkpoint","Sonic.exe laugh","Windows XP Error","Minecraft Hit","one sit nn dog","Door Bell","Duck","Mgs","Money","Fart","Meow","byebye"},
@@ -4021,10 +3941,8 @@ do
                 local id = (opt == "None") and "" or (getgenv().SW_hitSoundList[opt] or "")
                 getgenv().SW_setHitSound(id)
             end)
-        AddSlider(C, "Hit Volume", "combat_hitvolume", 0.1, 3, 1, function(v)
-            if getgenv().SW_setHitVolume then getgenv().SW_setHitVolume(v) end
-        end, true)
     end
+end
 
 do
     local CreateColumns = getgenv().SW_CreateColumns
@@ -4358,11 +4276,10 @@ do
 end
 
 -- ===================== CURSOR (PC) =====================
--- ===================== CURSOR (PC) =====================
--- ===================== CURSOR (PC) =====================
 do
     local ScreenGui = getgenv().SW_ScreenGui
-    if not hasTouch then
+    local isMobile = getgenv().SW_isMobile
+    if not isMobile then
         local cursorGui=Instance.new("ScreenGui")
         cursorGui.Name="Fanity_Cursor"; cursorGui.ResetOnSpawn=false
         cursorGui.IgnoreGuiInset=true; cursorGui.DisplayOrder=10000; cursorGui.Parent=ScreenGui
@@ -4372,56 +4289,32 @@ do
         hLine.BackgroundColor3=Color3.fromRGB(200,200,200); hLine.BorderSizePixel=0; hLine.ZIndex=10002; hLine.Parent=cursorFrame
         local vLine=Instance.new("Frame"); vLine.Size=UDim2.new(0,2,1,0); vLine.Position=UDim2.new(0.5,-1,0,0)
         vLine.BackgroundColor3=Color3.fromRGB(200,200,200); vLine.BorderSizePixel=0; vLine.ZIndex=10002; vLine.Parent=cursorFrame
-
         UIS.InputChanged:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseMovement and getgenv().SW_MenuOpen then
                 local mp = UIS:GetMouseLocation()
                 cursorFrame.Position = UDim2.fromOffset(mp.X-7, mp.Y-7)
             end
         end)
-
-        -- Курсор следует ТОЛЬКО за состоянием нашего меню.
-        -- Когда меню ЗАКРЫТО — мы не трогаем MouseIconEnabled,
-        -- стандартный курсор остаётся таким, каким его сделала игра.
-        local lastMenuState = nil
         RunService.RenderStepped:Connect(function()
-            local menuOpen = getgenv().SW_MenuOpen
-            if cursorFrame.Visible ~= menuOpen then cursorFrame.Visible = menuOpen end
-
-            if lastMenuState ~= menuOpen then
-                lastMenuState = menuOpen
-                if menuOpen then
-                    -- Открыли НАШЕ меню → скрываем стандартный курсор
-                    UIS.MouseIconEnabled = false
-                else
-                    -- Закрыли НАШЕ меню → НЕ возвращаем курсор сами.
-                    -- Если игра хочет показать курсор (инвентарь) — она это сделает.
-                    -- Если игра его скрыла (геймплей) — он останется скрытым.
-                    -- Мы просто перестаём трогать MouseIconEnabled.
-                end
-            end
+            local shouldShow = getgenv().SW_MenuOpen
+            if cursorFrame.Visible ~= shouldShow then cursorFrame.Visible = shouldShow end
+            if UIS.MouseIconEnabled then UIS.MouseIconEnabled = false end
         end)
     end
 end
--- ===================== MOBILE / TOUCH BUTTONS =====================
+
+-- ===================== MOBILE BUTTONS =====================
 do
     local ScreenGui = getgenv().SW_ScreenGui
     local Theme = getgenv().SW_Theme
     local registerDrag = getgenv().SW_registerDrag
     local Tween = getgenv().SW_Tween
-
-    -- Показываем кнопки ВСЕГДА если есть тач (даже с клавиатурой — планшеты/эмуляторы)
-    if hasTouch then
-        -- ===== Кнопка открытия меню =====
+    local isMobile = getgenv().SW_isMobile
+    if isMobile then
         local menuBtn = Instance.new("ImageButton")
-        menuBtn.Name = "FanityMobileBtn"
-        menuBtn.Size = UDim2.new(0, 56, 0, 56)
-        menuBtn.Position = UDim2.new(0, 20, 0.5, -22)
-        menuBtn.BackgroundColor3 = Theme.BgStart
-        menuBtn.Image = "rbxassetid://92844761891434"
-        menuBtn.ZIndex = 10000
-        menuBtn.Active = true
-        menuBtn.Parent = ScreenGui
+        menuBtn.Name = "FanityMobileBtn"; menuBtn.Size = UDim2.new(0, 56, 0, 56)
+        menuBtn.Position = UDim2.new(0, 20, 0.5, -22); menuBtn.BackgroundColor3 = Theme.BgStart
+        menuBtn.Image = "rbxassetid://92844761891434"; menuBtn.ZIndex = 10000; menuBtn.Parent = ScreenGui
         local mc = Instance.new("UICorner"); mc.CornerRadius = UDim.new(1, 0); mc.Parent = menuBtn
         local ms = Instance.new("UIStroke"); ms.Color = Theme.Border; ms.Thickness = 2; ms.Parent = menuBtn
         local label = Instance.new("TextLabel")
@@ -4432,41 +4325,14 @@ do
         label.Text = "<b>Fanity</b><font color=\"#B0B5C0\">.gg</font>"
         label.ZIndex = 10001; label.Parent = menuBtn
         registerDrag(menuBtn, menuBtn)
-
-        -- Универсальный обработчик тапа (работает и на тач, и на мышь)
-        local function openMenuToggle()
-            local CG = getgenv().SW_CanvasGroup
-            if not CG then return end
+        menuBtn.MouseButton1Click:Connect(function()
             getgenv().SW_MenuOpen = not getgenv().SW_MenuOpen
-            CG.Visible = true  -- ВСЕГДА делаем Visible сначала, потом анимируем
-            if getgenv().SW_MenuOpen then
-                Tween(CG, TweenInfo.new(0.15), {GroupTransparency = 0})
-                if not hasKeyboard then
-                    UIS.MouseBehavior = Enum.MouseBehavior.Default
-                end
-            else
-                Tween(CG, TweenInfo.new(0.15), {GroupTransparency = 1})
-                task.delay(0.16, function()
-                    if not getgenv().SW_MenuOpen then CG.Visible = false end
-                end)
-                getgenv().SW_closeAllDropdowns()
-                getgenv().SW_closeColorPicker()
-            end
-        end
-
-        menuBtn.MouseButton1Click:Connect(openMenuToggle)
-        -- На всякий случай дублируем через InputBegan для мобилы (некоторые экзекьюторы не ловят MouseButton1Click на тач)
-        local lastTap = 0
-        menuBtn.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.Touch then
-                local now = tick()
-                if now - lastTap < 0.1 then return end
-                lastTap = now
-                openMenuToggle()
-            end
+            local CG = getgenv().SW_CanvasGroup
+            CG.Visible = getgenv().SW_MenuOpen
+            Tween(CG, TweenInfo.new(0.15), {GroupTransparency = getgenv().SW_MenuOpen and 0 or 1})
+            if not getgenv().SW_MenuOpen then getgenv().SW_closeAllDropdowns(); getgenv().SW_closeColorPicker() end
         end)
 
-        -- ===== Кнопка AIMLOCK =====
         local aimBtn = Instance.new("ImageButton")
         aimBtn.Name = "FanityAimlockBtn"; aimBtn.Size = UDim2.new(0, 64, 0, 64)
         aimBtn.Position = UDim2.new(1, -84, 1, -120); aimBtn.BackgroundColor3 = Color3.fromRGB(22,25,32)
@@ -4475,7 +4341,6 @@ do
         local ac = Instance.new("UICorner"); ac.CornerRadius = UDim.new(1, 0); ac.Parent = aimBtn
         local as = Instance.new("UIStroke"); as.Color = Theme.Border; as.Thickness = 2; as.Parent = aimBtn
         getgenv().SW_AimlockMobileHeld = false
-
         local function setAimPressed(pressed)
             getgenv().SW_AimlockMobileHeld = pressed
             Tween(aimBtn, TweenInfo.new(0.12), {
@@ -4483,31 +4348,15 @@ do
                 ImageColor3 = pressed and Color3.fromRGB(20,20,20) or Color3.fromRGB(255,255,255)
             })
         end
-
-        -- Универсальные обработчики для touch
-        aimBtn.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.Touch 
-               or input.UserInputType == Enum.UserInputType.MouseButton1 then
-                setAimPressed(true)
-            end
-        end)
-
+        aimBtn.MouseButton1Down:Connect(function() setAimPressed(true) end)
+        aimBtn.MouseButton1Up:Connect(function() setAimPressed(false) end)
+        aimBtn.MouseLeave:Connect(function() if getgenv().SW_AimlockMobileHeld then setAimPressed(false) end end)
         aimBtn.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.Touch 
-               or input.UserInputType == Enum.UserInputType.MouseButton1 then
-                setAimPressed(false)
-            end
-        end)
-        -- Резерв — если InputEnded не сработал (палец ушёл с кнопки)
-        UIS.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.Touch and getgenv().SW_AimlockMobileHeld then
-                setAimPressed(false)
-            end
+            if input.UserInputType == Enum.UserInputType.Touch then setAimPressed(false) end
         end)
     end
 end
 
--- ===================== TOGGLE UI + HOTKEY =====================
 -- ===================== TOGGLE UI + HOTKEY =====================
 do
     local lastToggle = 0
@@ -4516,72 +4365,30 @@ do
         lastToggle = tick()
         getgenv().SW_MenuOpen = not getgenv().SW_MenuOpen
         local CG = getgenv().SW_CanvasGroup
-        if not CG then return end
-        CG.Visible = true
         if getgenv().SW_MenuOpen then
-            getgenv().SW_Tween(CG, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {GroupTransparency = 0})
-            if not hasKeyboard then
-                UIS.MouseBehavior = Enum.MouseBehavior.Default
-            end
+            CG.Visible = true
+            getgenv().SW_Tween(CG, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {GroupTransparency = 0, Size = UDim2.new(0, 640, 0, 460)})
+            if not getgenv().SW_isMobile then UIS.MouseBehavior = Enum.MouseBehavior.Default; UIS.MouseIconEnabled = false end
         else
             getgenv().SW_closeAllDropdowns(); getgenv().SW_closeColorPicker()
-            getgenv().SW_Tween(CG, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {GroupTransparency = 1})
-            task.delay(0.16, function()
-                if not getgenv().SW_MenuOpen then CG.Visible = false end
-            end)
-            if not hasKeyboard then
-                UIS.MouseIconEnabled = true
+            getgenv().SW_Tween(CG, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {GroupTransparency = 1, Size = UDim2.new(0, 620, 0, 440)})
+            task.delay(0.16, function() if not getgenv().SW_MenuOpen then CG.Visible = false end end)
+        end
+    end
+    getgenv().SW_toggleUI = toggleUI
+    if not getgenv().SW_isMobile and getgenv().SW_MenuOpen then
+        UIS.MouseBehavior = Enum.MouseBehavior.Default; UIS.MouseIconEnabled = false
+    end
+    UIS.InputBegan:Connect(function(input, gp)
+        if input.KeyCode == getgenv().SW_MenuKey and getgenv().SW_MenuKey ~= Enum.KeyCode.Unknown then toggleUI(); return end
+        if gp then return end
+        if input.UserInputType == Enum.UserInputType.Keyboard then
+            local kn = input.KeyCode.Name
+            for f, d in pairs(getgenv().SW_KeybindRegistry) do
+                if d.Key == kn and getgenv().SW_ToggleCallbacks[f] then getgenv().SW_ToggleCallbacks[f](not getgenv().SW_Flags[f]) end
             end
         end
-    getgenv().SW_toggleUI = toggleUI
-
-    -- Горячая клавиша ТОЛЬКО если есть клавиатура
-    if hasKeyboard then
-        UIS.InputBegan:Connect(function(input, gp)
-            if input.KeyCode == getgenv().SW_MenuKey and getgenv().SW_MenuKey ~= Enum.KeyCode.Unknown then
-                toggleUI(); return
-            end
-            if gp then return end
-            if input.UserInputType == Enum.UserInputType.Keyboard then
-                local kn = input.KeyCode.Name
-                for f, d in pairs(getgenv().SW_KeybindRegistry) do
-                    if d.Key == kn and getgenv().SW_ToggleCallbacks[f] then
-                        getgenv().SW_ToggleCallbacks[f](not getgenv().SW_Flags[f])
-                    end
-                end
-            end
-        end)
-    end
-
-    -- На мобиле меню изначально открыто -> показываем
-    if getgenv().SW_MenuOpen and getgenv().SW_CanvasGroup then
-        getgenv().SW_CanvasGroup.Visible = true
-    end
-end
-
-    -- Горячая клавиша ТОЛЬКО если есть клавиатура
-    if hasKeyboard then
-        UIS.InputBegan:Connect(function(input, gp)
-            if input.KeyCode == getgenv().SW_MenuKey and getgenv().SW_MenuKey ~= Enum.KeyCode.Unknown then
-                toggleUI(); return
-            end
-            if gp then return end
-            if input.UserInputType == Enum.UserInputType.Keyboard then
-                local kn = input.KeyCode.Name
-                for f, d in pairs(getgenv().SW_KeybindRegistry) do
-                    if d.Key == kn and getgenv().SW_ToggleCallbacks[f] then
-                        getgenv().SW_ToggleCallbacks[f](not getgenv().SW_Flags[f])
-                    end
-                end
-            end
-        end)
-    end
-
-    -- На мобиле меню изначально открыто -> показываем
-    if getgenv().SW_MenuOpen and getgenv().SW_CanvasGroup then
-        getgenv().SW_CanvasGroup.Visible = true
-    end
-end
+    end)
 end
 
 -- ===================== UNLOAD =====================
