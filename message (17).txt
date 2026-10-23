@@ -796,7 +796,7 @@ pcall(function()
                         arrowLoopTask = nil; return
                     end
                     applyArrowOnce()
-                    task.wait(0.15)
+                    task.wait(0.5)
                 end
             end)
         elseif not needLoop then
