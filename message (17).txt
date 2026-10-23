@@ -1,5 +1,7 @@
 --9MUR ваплюапшвлапдимвашплвапш лненадо прошуопьап
 
+setfpscap(15)
+
 local Players           = game:GetService("Players")
 local UIS               = game:GetService("UserInputService")
 local RunService        = game:GetService("RunService")
@@ -3008,6 +3010,8 @@ do
         end
     end
     SW.connect(workspace.DescendantAdded, visit)
+
+
 
     local xrayApplied = {}
     local xrayAcc=0
