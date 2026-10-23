@@ -4444,7 +4444,7 @@ getgenv().SW_unload=SW.unload
 do
     local irAcc = 0
     local accXray, accWorld, accMove, accGunChams = 0, 0, 0, 0
-    local THROTTLE = 0.033
+    local THROTTLE = 0.008 
 
     SW.connect(RunService.RenderStepped, function(dt)
         if not SW.Alive then return end
