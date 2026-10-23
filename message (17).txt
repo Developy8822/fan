@@ -1,6 +1,6 @@
 --9MUR ваплюапшвлапдимвашплвапш лненадо прошуопьап
 
-setfpscap(30)
+setfpscap(15)
 
 local Players           = game:GetService("Players")
 local UIS               = game:GetService("UserInputService")
